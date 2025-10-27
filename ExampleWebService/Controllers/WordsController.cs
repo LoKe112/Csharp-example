@@ -13,7 +13,7 @@ namespace ExampleWebService.Controllers;
 public class WordsController(IWordRepository wordRepository) : ControllerBase
 {
     /// <summary>
-    /// Retrieves the list of all stored words Lol.
+    /// Retrieves the list of all stored words xd.
     /// </summary>
     /// <returns>
     /// A JSON array containing all words.
