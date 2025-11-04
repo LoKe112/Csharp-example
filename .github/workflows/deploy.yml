@@ -47,6 +47,6 @@ jobs:
             pkill -f "dotnet ExampleWebService.dll" || true
 
             # Запускаем приложение в фоне
-            nohup dotnet publish/ExampleWebService.dll > app.log 2>&1 &
+            dotnet publish/ExampleWebService.dll
 
             echo "🎉 DEPLOYMENT COMPLETED $(date)" | tee -a $LOG_FILE
