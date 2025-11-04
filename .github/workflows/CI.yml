@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [gitactions]
+    branches: [Actions]
   pull_request:
-    branches-ignore: [gitactions]
+    branches-ignore: [Actions]
 
 jobs:
   build-and-test:
