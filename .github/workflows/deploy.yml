@@ -1,0 +1,100 @@
+name: CD
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+
+            APP_DIR="/home/vboxuser/Desktop/csharp-example"
+            LOG_FILE="/home/vboxuser/Desktop/deploy.log"
+            CONTAINER_NAME="web-app"
+            IMAGE_NAME="ghcr.io/loke112/example-web-service:latest"
+
+            echo "=== DOCKER DEPLOYMENT STARTED ===" > $LOG_FILE
+            echo "Time: $(date)" >> $LOG_FILE
+
+            # Логинимся в GitHub Container Registry
+            echo "🔑 Logging in to GitHub Container Registry..." | tee -a $LOG_FILE
+            echo "${{ secrets.TOKEN }}" | sudo docker login ghcr.io -u kosenkomichael --password-stdin >> $LOG_FILE 2>&1
+
+            # Проверяем, что образ доступен
+            echo "🔍 Checking available images..." | tee -a $LOG_FILE
+            sudo docker images | grep ois-csharp >> $LOG_FILE 2>&1 || echo "No local images found" | tee -a $LOG_FILE
+
+            # Скачиваем новый образ из GitHub Registry
+            echo "📥 Pulling new Docker image..." | tee -a $LOG_FILE
+            sudo docker pull $IMAGE_NAME >> $LOG_FILE 2>&1
+
+            # Проверяем, что образ скачался
+            echo "✅ Pulled images:" | tee -a $LOG_FILE
+            sudo docker images | grep ois-csharp >> $LOG_FILE
+
+            # Останавливаем и удаляем старый контейнер
+            echo "🛑 Stopping old container..." | tee -a $LOG_FILE
+            sudo docker stop $CONTAINER_NAME >> $LOG_FILE 2>&1 || true
+            sudo docker rm $CONTAINER_NAME >> $LOG_FILE 2>&1 || true
+
+            # Проверяем порт
+            echo "🔍 Checking port 8181..." | tee -a $LOG_FILE
+            sudo netstat -tulpn | grep 8181 >> $LOG_FILE 2>&1 || echo "Port 8181 is free" | tee -a $LOG_FILE
+
+            # Запускаем новый контейнер с диагностикой
+            echo "🚀 Starting new container..." | tee -a $LOG_FILE
+            sudo docker run -d \
+              --name $CONTAINER_NAME \
+              --restart unless-stopped \
+              -p 8181:8181 \
+              $IMAGE_NAME >> $LOG_FILE 2>&1
+
+            # Проверяем статус контейнера
+            echo "✅ Container status after run:" | tee -a $LOG_FILE
+            sudo docker ps -a | grep $CONTAINER_NAME >> $LOG_FILE
+
+            # Если контейнер не запустился, смотрим ошибки
+            if ! sudo docker ps | grep -q $CONTAINER_NAME; then
+              echo "❌ Container failed to start. Checking logs..." | tee -a $LOG_FILE
+              sudo docker logs $CONTAINER_NAME >> $LOG_FILE 2>&1
+              exit 1
+            fi
+
+            # Ждем запуска приложения
+            echo "⏳ Waiting for application to start..." | tee -a $LOG_FILE
+            sleep 5
+
+            # Проверяем логи контейнера
+            echo "📋 Container logs:" | tee -a $LOG_FILE
+            sudo docker logs $CONTAINER_NAME >> $LOG_FILE 2>&1
+
+            # Проверяем здоровье приложения
+            echo "🏥 Health check..." | tee -a $LOG_FILE
+            if curl -f http://localhost:8181/api/Words >> $LOG_FILE 2>&1; then
+              echo "✅ Health check passed" | tee -a $LOG_FILE
+            else
+              echo "⚠️ Health check failed, checking container status..." | tee -a $LOG_FILE
+              sudo docker ps -a >> $LOG_FILE
+              sudo docker logs $CONTAINER_NAME >> $LOG_FILE 2>&1
+            fi
+
+            echo "🎉 DOCKER DEPLOYMENT COMPLETED $(date)" | tee -a $LOG_FILE
