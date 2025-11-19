@@ -37,11 +37,11 @@ jobs:
 
             # Логинимся в GitHub Container Registry
             echo "🔑 Logging in to GitHub Container Registry..." | tee -a $LOG_FILE
-            echo "${{ secrets.TOKEN }}" | sudo docker login ghcr.io -u kosenkomichael --password-stdin >> $LOG_FILE 2>&1
+            echo "${{ secrets.TOKEN }}" | sudo docker login ghcr.io -u loke112 --password-stdin >> $LOG_FILE 2>&1
 
             # Проверяем, что образ доступен
             echo "🔍 Checking available images..." | tee -a $LOG_FILE
-            sudo docker images | grep ois-csharp >> $LOG_FILE 2>&1 || echo "No local images found" | tee -a $LOG_FILE
+            sudo docker images | grep example-web-service >> $LOG_FILE 2>&1 || echo "No local images found" | tee -a $LOG_FILE
 
             # Скачиваем новый образ из GitHub Registry
             echo "📥 Pulling new Docker image..." | tee -a $LOG_FILE
@@ -49,7 +49,7 @@ jobs:
 
             # Проверяем, что образ скачался
             echo "✅ Pulled images:" | tee -a $LOG_FILE
-            sudo docker images | grep ois-csharp >> $LOG_FILE
+            sudo docker images | grep example-web-service >> $LOG_FILE
 
             # Останавливаем и удаляем старый контейнер
             echo "🛑 Stopping old container..." | tee -a $LOG_FILE
