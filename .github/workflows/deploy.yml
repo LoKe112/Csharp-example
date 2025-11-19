@@ -30,7 +30,7 @@ jobs:
             APP_DIR="/home/vboxuser/Desktop/csharp-example"
             LOG_FILE="/home/vboxuser/Desktop/deploy.log"
             CONTAINER_NAME="web-app"
-            IMAGE_NAME="ghcr.io/loke112/example-web-service:latest"
+            IMAGE_NAME="ghcr.io/loke112/csharp-example:latest"
 
             echo "=== DOCKER DEPLOYMENT STARTED ===" > $LOG_FILE
             echo "Time: $(date)" >> $LOG_FILE
