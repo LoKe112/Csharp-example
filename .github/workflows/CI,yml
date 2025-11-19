@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [docker]
+  pull_request:
+    branches: [docker]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore WebService dependencies
+        run: dotnet restore ExampleWebService/ExampleWebService.csproj
+
+      - name: Restore Test Project dependencies
+        run: dotnet restore ExampleTestProject/ExampleTestProject.csproj
+
+      - name: Build WebService
+        run: dotnet build ExampleWebService/ExampleWebService.csproj -c Release --no-restore
+
+      - name: Build Test Project
+        run: dotnet build ExampleTestProject/ExampleTestProject.csproj -c Release --no-restore
+
+      - name: Publish WebService
+        run: dotnet publish ExampleWebService/ExampleWebService.csproj -c Release -r linux-x64 --self-contained false -o publish
+
+      - name: Upload WebService artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webservice
+          path: ExampleWebService/publish/
+
+      - name: Run Tests
+        run: dotnet test ExampleTestProject/ExampleTestProject.csproj -c Release --no-restore --verbosity normal
+
+  docker-build-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.TOKEN }}
+          
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/csharp-example:latest
+            ghcr.io/${{ github.repository_owner }}/csharp-example:${{ github.sha }}
