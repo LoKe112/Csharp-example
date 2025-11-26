@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [docker-compose]
+    branches: [docker-compose-fix]
   pull_request:
-    branches: [docker-compose]
+    branches: [docker-compose-fix]
 
 jobs:
   build-and-test:
