@@ -1,0 +1,69 @@
+name: CD
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+
+            LOG_FILE="/home/vboxuser/Desktop/deploy.log"
+            APP_DIR="/home/vboxuser/Desktop/csharp-example"
+            COMPOSE_FILE="/home/vboxuser/Desktop/csharp-example/docker-compose.yml"
+
+            echo "=== DOCKER COMPOSE DEPLOYMENT STARTED ===" > $LOG_FILE
+            echo "Time: $(date)" >> $LOG_FILE
+
+            # Логинимся в GHCR
+            echo "🔑 Logging in to GHCR..." | tee -a $LOG_FILE
+            echo "${{ secrets.TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin >> $LOG_FILE 2>&1
+
+            # Переходим в директорию приложения
+            cd $APP_DIR
+
+            # Pull latest images
+            echo "📥 Pulling latest Docker images..." | tee -a $LOG_FILE
+            docker compose -f $COMPOSE_FILE pull --progress=plain >> $LOG_FILE 2>&1
+
+            # Stop old containers and remove
+            echo "🛑 Stopping and removing old containers..." | tee -a $LOG_FILE
+            docker compose -f $COMPOSE_FILE down >> $LOG_FILE 2>&1
+
+            # Kill processes that may still occupy ports
+            echo "🔪 Killing processes on ports 5432 and 8181 (if any)..." | tee -a $LOG_FILE
+            sudo kill -9 $(sudo lsof -t -i:5432) 2>/dev/null || true
+            sudo kill -9 $(sudo lsof -t -i:8181) 2>/dev/null || true
+
+            # Remove old DB volume
+            echo "🧨 Removing old DB volume..." | tee -a $LOG_FILE
+            docker volume rm csharp-example_db-data 2>/dev/null || true
+
+            # Start new containers
+            echo "🚀 Starting new containers..." | tee -a $LOG_FILE
+            docker compose -f $COMPOSE_FILE up -d >> $LOG_FILE 2>&1
+
+
+            # Check containers status
+            echo "📋 Containers status:" | tee -a $LOG_FILE
+            docker compose -f $COMPOSE_FILE ps >> $LOG_FILE 2>&1
+
+            # Cleanup unused images
+            echo "🧹 Cleaning up unused Docker images..." | tee -a $LOG_FILE
+            docker image prune -f >> $LOG_FILE 2>&1
+
+            echo "🎉 DOCKER COMPOSE DEPLOYMENT COMPLETED $(date)" | tee -a $LOG_FILE
